@@ -12,14 +12,22 @@
     "dev": "bun src/index.ts",
     "test": "bun test"
   },
-  "keywords": ["material-design", "theme", "color", "cli", "bun"],
+  "keywords": [
+    "material-design",
+    "theme",
+    "color",
+    "cli",
+    "bun"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
-    "commander": "^12.0.0"
+    "commander": "^12.0.0",
+    "culori": "^4.0.2"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "tsx": "^4.21.0"
   }
 }
