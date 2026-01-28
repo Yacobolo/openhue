@@ -3,7 +3,7 @@
  * Formats the MaterialTheme object to JSON matching Material Theme Builder output
  */
 
-import { MaterialTheme } from "./types.js";
+import { MaterialTheme } from "./types";
 
 /**
  * Formats a MaterialTheme object to a JSON string

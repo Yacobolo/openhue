@@ -1,14 +1,13 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Material Theme CLI
  * Generates Material Design 3 color themes from a seed color
  */
 
 import { Command } from "commander";
-import { writeFileSync } from "fs";
-import { generateTheme, isValidHexColor } from "./generator.js";
-import { formatThemeJson } from "./formatter.js";
-import type { SchemeVariant } from "./types.js";
+import { generateTheme, isValidHexColor } from "./generator";
+import { formatThemeJson } from "./formatter";
+import type { SchemeVariant } from "./types";
 
 const SCHEME_VARIANTS: SchemeVariant[] = [
   "tonal-spot",
@@ -39,7 +38,7 @@ program
     `Scheme variant: ${SCHEME_VARIANTS.join(", ")}`,
     "tonal-spot"
   )
-  .action((options) => {
+  .action(async (options) => {
     const { seed, output, scheme } = options;
 
     // Validate seed color
@@ -65,7 +64,7 @@ program
 
       // Output to file or stdout
       if (output) {
-        writeFileSync(output, json, "utf-8");
+        await Bun.write(output, json);
         console.log(`Theme generated successfully: ${output}`);
       } else {
         console.log(json);

@@ -32,7 +32,7 @@ import {
   Schemes,
   SchemeVariant,
   TONE_VALUES,
-} from "./types.js";
+} from "./types";
 
 /** Contrast levels for different scheme variants */
 const CONTRAST_LEVELS = {
