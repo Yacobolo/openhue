@@ -792,6 +792,17 @@ export class ColorSchemeViewer extends LitElement {
       border-radius: 8px;
     }
 
+    .seg-btn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 4px;
+    }
+
+    .seg-btn-icon svg {
+      display: block;
+    }
+
     .seg-btn:focus-visible {
       outline: 2px solid var(--primary, #6750a4);
       outline-offset: -2px;
@@ -1692,7 +1703,12 @@ export class ColorSchemeViewer extends LitElement {
     // Section icons (16x16 stroke icons)
     const paletteIcon = html`<span class="section-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.38-.15-.74-.39-1.02-.24-.28-.39-.64-.39-1.02 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.49-9-10-9z"/></svg></span>`;
     const gridIcon = html`<span class="section-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>`;
-    const contrastIcon = html`<span class="section-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20" /><path d="M12 2a10 10 0 0 1 0 20" fill="currentColor" opacity="0.15"/></svg></span>`;
+    const contrastIcon = html`<span class="section-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zm-2 5.79V18h-3.52L12 20.48 9.52 18H6v-3.52L3.52 12 6 9.52V6h3.52L12 3.52 14.48 6H18v3.52L20.48 12 18 14.48zM12 6v12c3.31 0 6-2.69 6-6s-2.69-6-6-6z"/></svg></span>`;
+
+    // Contrast level icons (Material brightness_low / medium / high)
+    const contrastStandardIcon = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zm-2 5.79V18h-3.52L12 20.48 9.52 18H6v-3.52L3.52 12 6 9.52V6h3.52L12 3.52 14.48 6H18v3.52L20.48 12 18 14.48zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>`;
+    const contrastMediumIcon = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zm-2 5.79V18h-3.52L12 20.48 9.52 18H6v-3.52L3.52 12 6 9.52V6h3.52L12 3.52 14.48 6H18v3.52L20.48 12 18 14.48zM12 6v12c3.31 0 6-2.69 6-6s-2.69-6-6-6z"/></svg>`;
+    const contrastHighIcon = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zm-2 5.79V18h-3.52L12 20.48 9.52 18H6v-3.52L3.52 12 6 9.52V6h3.52L12 3.52 14.48 6H18v3.52L20.48 12 18 14.48zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/><circle cx="12" cy="12" r="2.5"/></svg>`;
     const downloadIcon = html`<span class="section-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>`;
 
     return html`
@@ -1811,18 +1827,20 @@ export class ColorSchemeViewer extends LitElement {
             <div class="segmented" role="radiogroup" aria-labelledby="contrast-heading">
               <div class="seg-pill" style="width: calc(100% / 3); transform: translateX(${this._contrastLevel === 0 ? 0 : this._contrastLevel === 0.5 ? 100 : 200}%)"></div>
               ${([
-                { label: "Standard", value: 0.0 },
-                { label: "Medium", value: 0.5 },
-                { label: "High", value: 1.0 },
-              ] as const).map(
+                { label: "Standard", value: 0.0, icon: contrastStandardIcon },
+                { label: "Medium", value: 0.5, icon: contrastMediumIcon },
+                { label: "High", value: 1.0, icon: contrastHighIcon },
+              ] as { label: string; value: number; icon: unknown }[]).map(
                 (c) => html`
                   <button
-                    class="seg-btn ${this._contrastLevel === c.value ? "active" : ""}"
+                    class="seg-btn seg-btn-icon ${this._contrastLevel === c.value ? "active" : ""}"
                     role="radio"
                     aria-checked=${this._contrastLevel === c.value}
+                    aria-label="${c.label} contrast"
+                    title="${c.label} contrast"
                     @click=${() => this._selectContrast(c.value)}
                   >
-                    ${c.label}
+                    ${c.icon}
                   </button>
                 `
               )}
