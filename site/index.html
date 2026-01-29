@@ -10,11 +10,22 @@
         :root {
             --page-bg: #fef7ff;
             --page-text: #1d1b20;
+            --page-outline-variant: #cac4d0;
+            --page-on-surface-variant: #49454f;
+            --page-surface-container: #f3edf7;
+            --page-surface-container-high: #ece6f0;
+            --page-primary: #6750a4;
+            --header-height: 56px;
         }
 
         .dark {
             --page-bg: #141218;
             --page-text: #e6e0e9;
+            --page-outline-variant: #49454f;
+            --page-on-surface-variant: #cac4d0;
+            --page-surface-container: #211f26;
+            --page-surface-container-high: #2b2930;
+            --page-primary: #d0bcff;
         }
 
         /* Pre-JS flash prevention: respect system preference immediately */
@@ -22,6 +33,11 @@
             :root:not(.light-override) {
                 --page-bg: #141218;
                 --page-text: #e6e0e9;
+                --page-outline-variant: #49454f;
+                --page-on-surface-variant: #cac4d0;
+                --page-surface-container: #211f26;
+                --page-surface-container-high: #2b2930;
+                --page-primary: #d0bcff;
             }
         }
 
@@ -39,43 +55,169 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
+        /* ─── Sticky Header ─── */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            background: color-mix(in srgb, var(--page-bg) 80%, transparent);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border-bottom: 1px solid var(--page-outline-variant);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .app-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .app-logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            background: linear-gradient(135deg, #6750a4 0%, #7f67be 100%);
+            color: white;
+            flex-shrink: 0;
+            transition: background 0.3s ease;
+        }
+
+        .app-title {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+            color: var(--page-text);
+            transition: color 0.3s ease;
+        }
+
+        .app-title-sub {
+            display: none;
+            font-size: 12px;
+            font-weight: 400;
+            margin-left: 10px;
+            color: var(--page-on-surface-variant);
+            transition: color 0.3s ease;
+        }
+
+        .app-header-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .header-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--page-text);
+            transition: background-color 0.15s ease, color 0.15s ease;
+            position: relative;
+        }
+
+        .header-btn:hover {
+            background: color-mix(in srgb, var(--page-on-surface-variant) 12%, transparent);
+        }
+
+        .header-btn:active {
+            background: color-mix(in srgb, var(--page-on-surface-variant) 18%, transparent);
+        }
+
+        .header-btn:focus-visible {
+            outline: 2px solid var(--page-primary);
+            outline-offset: 2px;
+        }
+
+        .header-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .header-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--page-outline-variant);
+            margin: 0 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        /* ─── Page Shell ─── */
         .page-shell {
             max-width: 1440px;
             margin: 0 auto;
-            padding: 32px 40px;
+            padding: 28px 32px;
         }
 
-        .page-header {
-            margin-bottom: 32px;
-        }
-
-        .page-header h1 {
-            font-weight: 600;
-            font-size: 28px;
-            margin: 0 0 6px;
-            letter-spacing: -0.5px;
-        }
-
-        .page-header p {
-            margin: 0;
-            opacity: 0.6;
-            font-size: 15px;
-            line-height: 1.5;
+        @media (min-width: 1100px) {
+            .app-title-sub {
+                display: inline;
+            }
         }
 
         @media (max-width: 600px) {
-            .page-shell { padding: 16px; }
-            .page-header h1 { font-size: 22px; }
+            .app-header {
+                padding: 0 16px;
+            }
+            .page-shell {
+                padding: 16px;
+            }
+            .app-title {
+                font-size: 14px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="page-shell">
-        <div class="page-header">
-            <h1>Design Token Configurator</h1>
-            <p>Configure your brand color and scheme variant, then copy the CLI command to generate CSS design tokens.</p>
+    <!-- ═══ Sticky Header ═══ -->
+    <header class="app-header">
+        <div class="app-header-left">
+            <div class="app-logo" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><circle cx="8.5" cy="15.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/></svg>
+            </div>
+            <span class="app-title">Design Tokens</span>
+            <span class="app-title-sub">Material Design 3 Configurator</span>
         </div>
+        <div class="app-header-right">
+            <button
+                class="header-btn"
+                id="theme-toggle-btn"
+                aria-label="Toggle theme"
+                title="Toggle theme"
+            >
+                <svg id="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg id="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            </button>
+            <div class="header-divider"></div>
+            <a
+                class="header-btn"
+                href="https://github.com/anthropics/hct-reverse-engineer"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View on GitHub"
+                title="View on GitHub"
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
+        </div>
+    </header>
 
+    <!-- ═══ Main Content ═══ -->
+    <div class="page-shell">
         <color-scheme-viewer seed="#769CDF"></color-scheme-viewer>
     </div>
 
@@ -85,5 +227,40 @@
         </p>
     </noscript>
     <script type="module" src="/src/color-scheme-viewer.ts"></script>
+    <script>
+        // Header theme toggle wiring — communicates with the web component
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('theme-toggle-btn');
+            const sunIcon = document.getElementById('theme-icon-sun');
+            const moonIcon = document.getElementById('theme-icon-moon');
+            const viewer = document.querySelector('color-scheme-viewer');
+
+            function updateIcons(isDark) {
+                if (sunIcon && moonIcon) {
+                    sunIcon.style.display = isDark ? 'none' : 'block';
+                    moonIcon.style.display = isDark ? 'block' : 'none';
+                }
+            }
+
+            // Set initial state from system preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            updateIcons(prefersDark);
+
+            btn?.addEventListener('click', () => {
+                // Dispatch custom event the web component listens for
+                document.dispatchEvent(new CustomEvent('header-theme-toggle'));
+            });
+
+            // Listen for theme changes FROM the web component
+            document.addEventListener('theme-changed', (e) => {
+                updateIcons(e.detail?.dark);
+                // Update logo gradient with primary color if available
+                const logo = document.querySelector('.app-logo');
+                if (logo && e.detail?.primary) {
+                    logo.style.background = `linear-gradient(135deg, ${e.detail.primary} 0%, ${e.detail.primaryContainer || e.detail.primary} 100%)`;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

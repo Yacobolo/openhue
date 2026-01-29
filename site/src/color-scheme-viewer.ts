@@ -62,6 +62,7 @@ export class ColorSchemeViewer extends LitElement {
   @state() private _variantPreviews: VariantPreview[] = [];
   @state() private _copiedCommand = false;
   @state() private _copiedSwatch = "";
+  @state() private _outputExpanded = true;
 
   // Tonal palettes — derived from seed + variant (cached, mode-independent)
   @state() private _palettes: PaletteSet | null = null;
@@ -286,21 +287,109 @@ export class ColorSchemeViewer extends LitElement {
     /* ─── Left: Sidebar configurator ─── */
     .sidebar {
       position: sticky;
-      top: 24px;
+      top: 80px; /* offset for sticky header */
       display: flex;
       flex-direction: column;
       gap: 0;
       background: var(--surface-container, #f0f0f0);
-      border-radius: 20px;
+      border-radius: 16px;
       overflow: hidden;
       border: 1px solid var(--outline-variant, #ddd);
       transition: var(--transition-color);
-      max-height: calc(100vh - 48px);
+      max-height: calc(100vh - 104px);
       overflow-y: auto;
       scrollbar-width: thin;
       scrollbar-color: var(--outline-variant, #ddd) transparent;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
 
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--outline-variant, #ddd);
+      border-radius: 3px;
+    }
+
+    /* ─── Sidebar section groups ─── */
+    .sidebar-group {
+      border-bottom: 1px solid var(--outline-variant, #ddd);
+      transition: var(--transition-color);
+    }
+
+    .sidebar-group:last-child {
+      border-bottom: none;
+    }
+
+    .sidebar-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      cursor: pointer;
+      user-select: none;
+      background: transparent;
+      border: none;
+      width: 100%;
+      color: inherit;
+      font-family: inherit;
+      transition: background-color 0.15s ease;
+    }
+
+    .sidebar-group-header:hover {
+      background: color-mix(in srgb, var(--on-surface, #1d1b20) 4%, transparent);
+    }
+
+    .sidebar-group-header:focus-visible {
+      outline: 2px solid var(--primary, #6750a4);
+      outline-offset: -2px;
+    }
+
+    .sidebar-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--on-surface-variant, #666);
+      transition: var(--transition-color);
+    }
+
+    .sidebar-group-chevron {
+      display: flex;
+      align-items: center;
+      color: var(--on-surface-variant, #666);
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+
+    .sidebar-group-chevron.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .sidebar-group-content {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.2s ease;
+      max-height: 600px;
+      opacity: 1;
+    }
+
+    .sidebar-group-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .sidebar-group-inner {
+      padding: 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ─── Sidebar simple sections (non-collapsible) ─── */
     .sidebar-section {
       padding: 20px;
       border-bottom: 1px solid var(--outline-variant, #ddd);
@@ -315,8 +404,23 @@ export class ColorSchemeViewer extends LitElement {
       margin: 0 0 12px;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
+      color: var(--on-surface-variant, #666);
+      transition: var(--transition-color);
+    }
+
+    /* ─── Sidebar sub-section (within groups) ─── */
+    .sidebar-sub {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sidebar-sub-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
       color: var(--on-surface-variant, #666);
       transition: var(--transition-color);
     }
@@ -328,16 +432,17 @@ export class ColorSchemeViewer extends LitElement {
       gap: 0;
       border-radius: 12px;
       overflow: hidden;
-      border: 2px solid var(--outline-variant, #ddd);
-      transition: var(--transition-color);
+      border: 1.5px solid var(--outline-variant, #ddd);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .seed-input-group:focus-within {
       border-color: var(--primary, #6750a4);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #6750a4) 14%, transparent);
     }
 
     .seed-swatch {
-      width: 52px;
+      width: 48px;
       flex-shrink: 0;
       transition: background-color 0.2s ease;
     }
@@ -345,9 +450,9 @@ export class ColorSchemeViewer extends LitElement {
     .seed-input {
       flex: 1;
       border: none;
-      padding: 12px 14px;
+      padding: 11px 14px;
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 500;
       letter-spacing: 0.5px;
       background: var(--surface-container-high, #e8e8e8);
@@ -358,19 +463,19 @@ export class ColorSchemeViewer extends LitElement {
 
     .seed-input::placeholder {
       color: var(--on-surface-variant, #666);
-      opacity: 0.5;
+      opacity: 0.4;
     }
 
     .seed-error {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--error, #b3261e);
       margin-top: 6px;
-      min-height: 18px;
+      min-height: 16px;
     }
 
     /* ─── Hue slider ─── */
     .hue-slider-group {
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .hue-slider-header {
@@ -383,16 +488,16 @@ export class ColorSchemeViewer extends LitElement {
     .hue-slider-label {
       font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
+      letter-spacing: 0.4px;
       color: var(--on-surface-variant, #666);
       transition: var(--transition-color);
     }
 
     .hue-slider-value {
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--on-surface-variant, #666);
+      opacity: 0.7;
       transition: var(--transition-color);
     }
 
@@ -400,96 +505,63 @@ export class ColorSchemeViewer extends LitElement {
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
-      height: 16px;
-      border-radius: 8px;
+      height: 14px;
+      border-radius: 7px;
       outline: none;
       cursor: pointer;
-      border: 2px solid var(--outline-variant, #ddd);
-      transition: border-color 0.2s ease;
+      border: 1.5px solid var(--outline-variant, #ddd);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .hue-slider:focus {
+    .hue-slider:focus-visible {
       border-color: var(--primary, #6750a4);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #6750a4) 14%, transparent);
     }
 
     /* Webkit thumb */
     .hue-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       background: white;
-      border: 3px solid var(--on-surface, #1d1b20);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      border: 2.5px solid var(--on-surface, #1d1b20);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
       cursor: pointer;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
 
     .hue-slider::-webkit-slider-thumb:hover {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      transform: scale(1.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    .hue-slider:active::-webkit-slider-thumb {
+      transform: scale(0.95);
     }
 
     /* Firefox thumb */
     .hue-slider::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       background: white;
-      border: 3px solid var(--on-surface, #1d1b20);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      border: 2.5px solid var(--on-surface, #1d1b20);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
       cursor: pointer;
     }
 
     .hue-slider::-moz-range-track {
-      height: 12px;
-      border-radius: 6px;
-    }
-
-    /* ─── Theme toggle (system / light / dark cycle) ─── */
-    .theme-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      padding: 10px 16px;
-      border-radius: 12px;
-      border: 2px solid var(--outline-variant, #ddd);
-      background: var(--surface-container-high, #e8e8e8);
-      color: var(--on-surface, #1d1b20);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      transition: var(--transition-color);
-    }
-
-    .theme-toggle:hover {
-      background: var(--surface-container-highest, #e0e0e0);
-      border-color: var(--outline, #bbb);
-    }
-
-    .theme-toggle:focus-visible {
-      outline: 2px solid var(--primary, #6750a4);
-      outline-offset: 2px;
-    }
-
-    .theme-toggle-icon {
-      display: flex;
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    .theme-toggle-label {
-      flex: 1;
-      text-align: left;
+      height: 10px;
+      border-radius: 5px;
     }
 
     /* ─── Variant selector cards ─── */
     .variant-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      gap: 6px;
     }
 
     .variant-card {
@@ -498,20 +570,31 @@ export class ColorSchemeViewer extends LitElement {
       align-items: center;
       gap: 6px;
       padding: 10px 4px 8px;
-      border-radius: 12px;
-      border: 2px solid transparent;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
       cursor: pointer;
       background: var(--surface-container-high, #e8e8e8);
-      transition: var(--transition-color);
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
     }
 
     .variant-card:hover {
       background: var(--surface-container-highest, #e0e0e0);
+      transform: translateY(-1px);
+    }
+
+    .variant-card:active {
+      transform: translateY(0);
     }
 
     .variant-card.active {
       border-color: var(--primary, #6750a4);
       background: var(--primary-container, #eaddff);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary, #6750a4) 20%, transparent);
+    }
+
+    .variant-card:focus-visible {
+      outline: 2px solid var(--primary, #6750a4);
+      outline-offset: 2px;
     }
 
     .variant-card .dots {
@@ -524,6 +607,7 @@ export class ColorSchemeViewer extends LitElement {
       height: 14px;
       border-radius: 50%;
       transition: background-color 0.2s ease;
+      box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
     }
 
     .variant-card .name {
@@ -544,9 +628,9 @@ export class ColorSchemeViewer extends LitElement {
     /* ─── Format segmented control ─── */
     .segmented {
       display: flex;
-      border-radius: 12px;
+      border-radius: 10px;
       overflow: hidden;
-      border: 2px solid var(--outline-variant, #ddd);
+      border: 1.5px solid var(--outline-variant, #ddd);
       transition: var(--transition-color);
     }
 
@@ -559,7 +643,7 @@ export class ColorSchemeViewer extends LitElement {
       font-weight: 600;
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
       letter-spacing: 0.3px;
-      transition: var(--transition-color);
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     .seg-btn.active {
@@ -576,37 +660,44 @@ export class ColorSchemeViewer extends LitElement {
       background: var(--surface-container-highest, #e0e0e0);
     }
 
+    .seg-btn:focus-visible {
+      outline: 2px solid var(--primary, #6750a4);
+      outline-offset: -2px;
+    }
+
     /* ─── Output dir input ─── */
     .dir-input {
       width: 100%;
-      border: 2px solid var(--outline-variant, #ddd);
-      border-radius: 12px;
-      padding: 10px 14px;
+      border: 1.5px solid var(--outline-variant, #ddd);
+      border-radius: 10px;
+      padding: 9px 12px;
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
       font-size: 13px;
       background: var(--surface-container-high, #e8e8e8);
       color: var(--on-surface, #1d1b20);
       outline: none;
-      transition: var(--transition-color);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .dir-input:focus {
       border-color: var(--primary, #6750a4);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #6750a4) 14%, transparent);
     }
 
     /* ─── CLI command block ─── */
     .command-block {
       position: relative;
       background: var(--surface-container-highest, #e0e0e0);
-      border-radius: 12px;
+      border-radius: 10px;
       overflow: hidden;
       transition: var(--transition-color);
+      border: 1px solid color-mix(in srgb, var(--outline-variant, #ddd) 50%, transparent);
     }
 
     .command-code {
       display: block;
-      padding: 14px 16px;
-      padding-right: 48px;
+      padding: 12px 14px;
+      padding-right: 44px;
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
       font-size: 12px;
       line-height: 1.6;
@@ -619,9 +710,9 @@ export class ColorSchemeViewer extends LitElement {
       position: absolute;
       top: 8px;
       right: 8px;
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
       border: none;
       cursor: pointer;
       display: flex;
@@ -629,13 +720,18 @@ export class ColorSchemeViewer extends LitElement {
       justify-content: center;
       background: var(--primary-container, #eaddff);
       color: var(--on-primary-container, #333);
-      font-size: 14px;
-      transition: var(--transition-color);
+      font-size: 13px;
+      transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
     }
 
     .copy-btn:hover {
       background: var(--primary, #6750a4);
       color: var(--on-primary, #fff);
+      transform: scale(1.05);
+    }
+
+    .copy-btn:active {
+      transform: scale(0.95);
     }
 
     .copy-btn.copied {
@@ -643,13 +739,18 @@ export class ColorSchemeViewer extends LitElement {
       color: var(--on-tertiary-container, #333);
     }
 
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--primary, #6750a4);
+      outline-offset: 2px;
+    }
+
     /* ─── File tree ─── */
     .file-tree {
       font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-      font-size: 12px;
-      line-height: 1.7;
+      font-size: 11px;
+      line-height: 1.8;
       color: var(--on-surface-variant, #666);
-      padding: 4px 0;
+      padding: 2px 0;
       transition: var(--transition-color);
     }
 
@@ -662,6 +763,7 @@ export class ColorSchemeViewer extends LitElement {
     .file-tree .file {
       color: var(--on-surface, #1d1b20);
       transition: var(--transition-color);
+      opacity: 0.8;
     }
 
     /* ─── Tonal Palettes ─── */
@@ -762,6 +864,7 @@ export class ColorSchemeViewer extends LitElement {
         order: -1;
         max-height: none;
         overflow-y: visible;
+        top: auto;
       }
 
       .scheme-main {
@@ -791,7 +894,7 @@ export class ColorSchemeViewer extends LitElement {
     @media (max-width: 600px) {
       .scheme-container {
         padding: 16px;
-        border-radius: 16px;
+        border-radius: 12px;
       }
 
       .scheme-main {
@@ -825,6 +928,23 @@ export class ColorSchemeViewer extends LitElement {
         aspect-ratio: 1 / 1;
         font-size: 9px;
       }
+
+      .sidebar {
+        border-radius: 12px;
+      }
+
+      .sidebar-section {
+        padding: 16px;
+      }
+
+      .sidebar-group-header {
+        padding: 12px 16px;
+      }
+
+      .sidebar-group-inner {
+        padding: 0 16px 16px;
+        gap: 14px;
+      }
     }
   `;
 
@@ -832,12 +952,24 @@ export class ColorSchemeViewer extends LitElement {
   //  Lifecycle
   // ────────────────────────────────────────────
 
+  // Bound handler reference for cleanup
+  private _boundHeaderToggle = () => this._cycleTheme();
+
   connectedCallback() {
     super.connectedCallback();
     this._hexInput = this.seed;
     // Use system preference only for initial default
     this._themePreference = this._darkMediaQuery.matches ? "dark" : "light";
+    // Listen for header theme toggle events
+    document.addEventListener("header-theme-toggle", this._boundHeaderToggle);
     this._regenerate();
+    // Notify header of initial theme state after first render
+    requestAnimationFrame(() => this._dispatchThemeChanged());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener("header-theme-toggle", this._boundHeaderToggle);
   }
 
   updated(changed: Map<string, unknown>) {
@@ -981,11 +1113,16 @@ export class ColorSchemeViewer extends LitElement {
     }
     document.body.classList.toggle("dark", dark);
 
-    // Set page background/text to the actual generated scheme tokens
+    // Set page-level semantic tokens so the header (outside shadow DOM) can use them
     const c = dark ? this._darkColors : this._lightColors;
     if (c) {
       document.body.style.setProperty("--page-bg", c.surface);
       document.body.style.setProperty("--page-text", c.onSurface);
+      document.body.style.setProperty("--page-outline-variant", c.outlineVariant);
+      document.body.style.setProperty("--page-on-surface-variant", c.onSurfaceVariant);
+      document.body.style.setProperty("--page-surface-container", c.surfaceContainer);
+      document.body.style.setProperty("--page-surface-container-high", c.surfaceContainerHigh);
+      document.body.style.setProperty("--page-primary", c.primary);
     }
   }
 
@@ -1005,6 +1142,22 @@ export class ColorSchemeViewer extends LitElement {
         : `#${this._hexInput.toUpperCase()}`;
       this._variantPreviews = generateVariantPreviews(hex, this._resolvedDark, this._contrastLevel);
     }
+    // Notify the page header of theme change
+    this._dispatchThemeChanged();
+  }
+
+  /** Dispatch a custom event so the page header can sync icons + logo */
+  private _dispatchThemeChanged() {
+    const c = this._resolvedDark ? this._darkColors : this._lightColors;
+    document.dispatchEvent(
+      new CustomEvent("theme-changed", {
+        detail: {
+          dark: this._resolvedDark,
+          primary: c?.primary,
+          primaryContainer: c?.primaryContainer,
+        },
+      })
+    );
   }
 
   private _selectContrast(level: number) {
@@ -1294,18 +1447,19 @@ export class ColorSchemeViewer extends LitElement {
   render() {
     if (!this._lightColors || !this._darkColors) return html`<p>Loading...</p>`;
 
-    // SVG icons for the theme toggle and scheme headers
+    // SVG icons for scheme headers
     const sunIcon = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
     const moonIcon = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
 
-    const themeIcon = this._themePreference === "light" ? sunIcon : moonIcon;
-    const themeLabel = this._themePreference === "light" ? "Light" : "Dark";
+    // Chevron icon for collapsible sections
+    const chevronIcon = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 
     return html`
       <div class="layout">
         <!-- ═══ LEFT: Configurator sidebar ═══ -->
         <div class="sidebar">
-          <!-- Seed color -->
+
+          <!-- ─── GROUP: Brand Color (always expanded, hero section) ─── -->
           <div class="sidebar-section">
             <h3 id="brand-color-heading">Brand Color</h3>
             <div class="seed-input-group">
@@ -1361,21 +1515,7 @@ export class ColorSchemeViewer extends LitElement {
             </div>
           </div>
 
-          <!-- Page theme toggle -->
-          <div class="sidebar-section">
-            <h3 id="appearance-heading">Page Theme</h3>
-            <button
-              class="theme-toggle"
-              @click=${() => this._cycleTheme()}
-              aria-label="Page theme: ${themeLabel}. Click to cycle."
-              title="Page theme: ${themeLabel}"
-            >
-              <span class="theme-toggle-icon" aria-hidden="true">${themeIcon}</span>
-              <span class="theme-toggle-label">${themeLabel}</span>
-            </button>
-          </div>
-
-          <!-- Variant selector -->
+          <!-- ─── GROUP: Scheme Settings (always expanded) ─── -->
           <div class="sidebar-section">
             <h3 id="variant-heading">Scheme Variant</h3>
             <div class="variant-grid" role="radiogroup" aria-labelledby="variant-heading">
@@ -1407,7 +1547,7 @@ export class ColorSchemeViewer extends LitElement {
             </div>
           </div>
 
-          <!-- Contrast level -->
+          <!-- ─── Contrast level ─── -->
           <div class="sidebar-section">
             <h3 id="contrast-heading">Contrast</h3>
             <div class="segmented" role="radiogroup" aria-labelledby="contrast-heading">
@@ -1430,57 +1570,78 @@ export class ColorSchemeViewer extends LitElement {
             </div>
           </div>
 
-          <!-- Color format -->
-          <div class="sidebar-section">
-            <h3>Color Format</h3>
-            <div class="segmented">
-              ${COLOR_FORMATS.map(
-                (f) => html`
-                  <button
-                    class="seg-btn ${f === this._format ? "active" : ""}"
-                    @click=${() => this._selectFormat(f)}
-                  >
-                    ${f}
-                  </button>
-                `
-              )}
+          <!-- ─── GROUP: Output (collapsible) ─── -->
+          <div class="sidebar-group">
+            <button
+              class="sidebar-group-header"
+              @click=${() => { this._outputExpanded = !this._outputExpanded; }}
+              aria-expanded=${this._outputExpanded}
+              aria-controls="output-group-content"
+            >
+              <span class="sidebar-group-label">Output</span>
+              <span class="sidebar-group-chevron ${this._outputExpanded ? '' : 'collapsed'}" aria-hidden="true">
+                ${chevronIcon}
+              </span>
+            </button>
+            <div
+              id="output-group-content"
+              class="sidebar-group-content ${this._outputExpanded ? '' : 'collapsed'}"
+            >
+              <div class="sidebar-group-inner">
+                <!-- Color format -->
+                <div class="sidebar-sub">
+                  <span class="sidebar-sub-label">Color Format</span>
+                  <div class="segmented">
+                    ${COLOR_FORMATS.map(
+                      (f) => html`
+                        <button
+                          class="seg-btn ${f === this._format ? "active" : ""}"
+                          @click=${() => this._selectFormat(f)}
+                        >
+                          ${f}
+                        </button>
+                      `
+                    )}
+                  </div>
+                </div>
+
+                <!-- Output directory -->
+                <div class="sidebar-sub">
+                  <label class="sidebar-sub-label" for="output-dir">Output Directory</label>
+                  <input
+                    id="output-dir"
+                    class="dir-input"
+                    type="text"
+                    .value=${this._outputDir}
+                    @input=${this._onDirInput}
+                    placeholder="./tokens"
+                    spellcheck="false"
+                  />
+                </div>
+
+                <!-- CLI command -->
+                <div class="sidebar-sub">
+                  <span class="sidebar-sub-label">CLI Command</span>
+                  <div class="command-block">
+                    <code class="command-code">${this._buildCommand()}</code>
+                    <button
+                      class="copy-btn ${this._copiedCommand ? "copied" : ""}"
+                      @click=${this._copyCommand}
+                      title="Copy command"
+                      aria-label=${this._copiedCommand ? "Command copied" : "Copy CLI command to clipboard"}
+                    >
+                      ${this._copiedCommand ? "\u{2713}" : "\u{2398}"}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- File tree -->
+                <div class="sidebar-sub">
+                  <span class="sidebar-sub-label">Output Structure</span>
+                  <div class="file-tree">${this._renderFileTree()}</div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <!-- Output directory -->
-          <div class="sidebar-section">
-            <h3><label for="output-dir">Output Directory</label></h3>
-            <input
-              id="output-dir"
-              class="dir-input"
-              type="text"
-              .value=${this._outputDir}
-              @input=${this._onDirInput}
-              placeholder="./tokens"
-              spellcheck="false"
-            />
-          </div>
-
-          <!-- CLI command -->
-          <div class="sidebar-section">
-            <h3>CLI Command</h3>
-            <div class="command-block">
-              <code class="command-code">${this._buildCommand()}</code>
-              <button
-                class="copy-btn ${this._copiedCommand ? "copied" : ""}"
-                @click=${this._copyCommand}
-                title="Copy command"
-                aria-label=${this._copiedCommand ? "Command copied" : "Copy CLI command to clipboard"}
-              >
-                ${this._copiedCommand ? "\u{2713}" : "\u{2398}"}
-              </button>
-            </div>
-          </div>
-
-          <!-- File tree -->
-          <div class="sidebar-section">
-            <h3>Output Structure</h3>
-            <div class="file-tree">${this._renderFileTree()}</div>
           </div>
         </div>
 
