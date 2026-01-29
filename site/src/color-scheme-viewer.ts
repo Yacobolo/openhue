@@ -610,7 +610,6 @@ export class ColorSchemeViewer extends LitElement {
       font-size: 12px;
       line-height: 1.6;
       color: var(--on-surface, #1d1b20);
-      white-space: pre-wrap;
       word-break: break-all;
       transition: var(--transition-color);
     }
@@ -1570,7 +1569,7 @@ export class ColorSchemeViewer extends LitElement {
         }
       }
       const connector = isLast ? "\u{2514}\u{2500}\u{2500} " : "\u{251C}\u{2500}\u{2500} ";
-      const padding = "    ".repeat(indent - 1);
+      const padding = "\u00A0\u00A0\u00A0\u00A0".repeat(indent - 1);
       return padding + connector;
     };
 
