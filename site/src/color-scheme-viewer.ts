@@ -176,7 +176,7 @@ export class ColorSchemeViewer extends LitElement {
     .color-stack {
       display: flex;
       flex-direction: column;
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
     }
 
@@ -244,7 +244,7 @@ export class ColorSchemeViewer extends LitElement {
     .surface-row {
       display: flex;
       width: 100%;
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
     }
 
@@ -279,7 +279,7 @@ export class ColorSchemeViewer extends LitElement {
 
     .utility-row .swatch {
       font-weight: bold;
-      border-radius: 12px;
+      border-radius: 8px;
     }
 
     /* ─── Left: Sidebar configurator ─── */
