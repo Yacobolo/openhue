@@ -52,6 +52,7 @@ export class ColorSchemeViewer extends LitElement {
   @property({ type: String }) seed = "#769CDF";
 
   @state() private _variant: SchemeVariant = "tonal-spot";
+  @state() private _contrastLevel: number = 0.0;
   @state() private _themePreference: ThemePreference = "light";
   @state() private _lightColors: SchemeColors | null = null;
   @state() private _darkColors: SchemeColors | null = null;
@@ -857,12 +858,12 @@ export class ColorSchemeViewer extends LitElement {
       ? this._hexInput.toUpperCase()
       : `#${this._hexInput.toUpperCase()}`;
 
-    // Generate BOTH light and dark schemes
-    this._lightColors = generateScheme(hex, this._variant, false);
-    this._darkColors = generateScheme(hex, this._variant, true);
+    // Generate BOTH light and dark schemes with current contrast level
+    this._lightColors = generateScheme(hex, this._variant, false, this._contrastLevel);
+    this._darkColors = generateScheme(hex, this._variant, true, this._contrastLevel);
 
-    // Variant previews — reactive to current light/dark preference
-    this._variantPreviews = generateVariantPreviews(hex, this._resolvedDark);
+    // Variant previews — reactive to current light/dark preference and contrast
+    this._variantPreviews = generateVariantPreviews(hex, this._resolvedDark, this._contrastLevel);
 
     // Only recompute tonal palettes when seed or variant actually changes
     const paletteCacheKey = `${hex}|${this._variant}`;
@@ -1002,8 +1003,13 @@ export class ColorSchemeViewer extends LitElement {
       const hex = this._hexInput.startsWith("#")
         ? this._hexInput.toUpperCase()
         : `#${this._hexInput.toUpperCase()}`;
-      this._variantPreviews = generateVariantPreviews(hex, this._resolvedDark);
+      this._variantPreviews = generateVariantPreviews(hex, this._resolvedDark, this._contrastLevel);
     }
+  }
+
+  private _selectContrast(level: number) {
+    this._contrastLevel = level;
+    this._regenerate();
   }
 
   private _selectFormat(f: ColorFormat) {
@@ -1062,6 +1068,8 @@ export class ColorSchemeViewer extends LitElement {
     const parts = [`bun src/index.ts -s "${this.seed}"`];
     if (this._format !== "oklch") parts.push(`-f ${this._format}`);
     if (this._variant !== "tonal-spot") parts.push(`--scheme ${this._variant}`);
+    if (this._contrastLevel === 0.5) parts.push("--contrast medium");
+    if (this._contrastLevel === 1.0) parts.push("--contrast high");
     if (this._outputDir !== "./tokens") parts.push(`-o ${this._outputDir}`);
     return parts.join(" ");
   }
@@ -1394,6 +1402,29 @@ export class ColorSchemeViewer extends LitElement {
                       >${VARIANT_LABELS[p.variant]}</span
                     >
                   </div>
+                `
+              )}
+            </div>
+          </div>
+
+          <!-- Contrast level -->
+          <div class="sidebar-section">
+            <h3 id="contrast-heading">Contrast</h3>
+            <div class="segmented" role="radiogroup" aria-labelledby="contrast-heading">
+              ${([
+                { label: "Standard", value: 0.0 },
+                { label: "Medium", value: 0.5 },
+                { label: "High", value: 1.0 },
+              ] as const).map(
+                (c) => html`
+                  <button
+                    class="seg-btn ${this._contrastLevel === c.value ? "active" : ""}"
+                    role="radio"
+                    aria-checked=${this._contrastLevel === c.value}
+                    @click=${() => this._selectContrast(c.value)}
+                  >
+                    ${c.label}
+                  </button>
                 `
               )}
             </div>

@@ -180,7 +180,8 @@ export function generateScheme(
  */
 export function generateVariantPreviews(
   seedHex: string,
-  isDark: boolean = false
+  isDark: boolean = false,
+  contrastLevel: number = 0.0
 ): VariantPreview[] {
   const normalized = seedHex.startsWith("#") ? seedHex : `#${seedHex}`;
   const argb = argbFromHex(normalized);
@@ -192,7 +193,7 @@ export function generateVariantPreviews(
     if (!Constructor) {
       throw new Error(`Unknown scheme variant: "${variant}"`);
     }
-    const scheme = new Constructor(hct, isDark, 0.0);
+    const scheme = new Constructor(hct, isDark, contrastLevel);
     return {
       variant,
       primary: hex(scheme.primary),

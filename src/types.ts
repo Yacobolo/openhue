@@ -131,11 +131,38 @@ export type SchemeVariant =
   | "neutral"
   | "vibrant";
 
+/** Supported contrast levels */
+export type ContrastLevel = "standard" | "medium" | "high";
+
+/** Mapping from ContrastLevel to numeric value */
+export const CONTRAST_LEVEL_VALUES: Record<ContrastLevel, number> = {
+  standard: 0.0,
+  medium: 0.5,
+  high: 1.0,
+} as const;
+
+/** Mapping from ContrastLevel to the scheme key suffixes */
+export const CONTRAST_SCHEME_KEYS: Record<
+  ContrastLevel,
+  { light: keyof Schemes; dark: keyof Schemes }
+> = {
+  standard: { light: "light", dark: "dark" },
+  medium: {
+    light: "light-medium-contrast",
+    dark: "dark-medium-contrast",
+  },
+  high: {
+    light: "light-high-contrast",
+    dark: "dark-high-contrast",
+  },
+} as const;
+
 /** CLI options for the generate command */
 export interface GenerateOptions {
   seed: string;
   output?: string;
   scheme: SchemeVariant;
+  contrast: ContrastLevel;
 }
 
 /** Tone values used in tonal palettes */

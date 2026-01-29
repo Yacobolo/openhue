@@ -7,7 +7,8 @@ import { mkdir, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { generateTheme } from "../generator";
-import type { SchemeVariant } from "../types";
+import type { SchemeVariant, ContrastLevel } from "../types";
+import { CONTRAST_SCHEME_KEYS } from "../types";
 import type { ColorFormat, TokenConfig } from "./config";
 import { DEFAULT_CONFIG, mergeConfig } from "./config";
 import { getHue } from "./colors";
@@ -22,6 +23,7 @@ export interface TokenGeneratorOptions {
   output?: string;
   format?: ColorFormat;
   scheme?: SchemeVariant;
+  contrast?: ContrastLevel;
   config?: Partial<TokenConfig>;
 }
 
@@ -34,6 +36,7 @@ export async function generateTokens(options: TokenGeneratorOptions): Promise<vo
     output,
     format = "oklch",
     scheme = "tonal-spot",
+    contrast = "standard",
     config: userConfig = {},
   } = options;
 
@@ -59,7 +62,8 @@ export async function generateTokens(options: TokenGeneratorOptions): Promise<vo
   await mkdir(openPropsDir, { recursive: true });
 
   // Generate Material theme from seed
-  console.log(`  Seed color: ${seed} (scheme: ${scheme})`);
+  const contrastLabel = contrast === "standard" ? "" : `, contrast: ${contrast}`;
+  console.log(`  Seed color: ${seed} (scheme: ${scheme}${contrastLabel})`);
   const theme = generateTheme(seed, scheme);
 
   // Get seed hue for shadow colors
@@ -91,11 +95,16 @@ export async function generateTokens(options: TokenGeneratorOptions): Promise<vo
     console.log(`  Generated open-props/${name}.css`);
   }
 
+  // Select the correct light/dark scheme pair for the chosen contrast level
+  const schemeKeys = CONTRAST_SCHEME_KEYS[contrast];
+  const lightScheme = theme.schemes[schemeKeys.light];
+  const darkScheme = theme.schemes[schemeKeys.dark];
+
   // Generate semantic.css
   console.log("  Generating semantic.css...");
   const semanticCSS = generateSemanticCSS(
-    theme.schemes.light,
-    theme.schemes.dark,
+    lightScheme,
+    darkScheme,
     config.semantic,
     config.prefixes,
     config.format,
