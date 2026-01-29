@@ -13,6 +13,7 @@ import {
   SchemeVibrant,
   argbFromHex,
   hexFromArgb,
+  TonalPalette,
 } from "@material/material-color-utilities";
 
 export type SchemeVariant =
@@ -270,4 +271,83 @@ export function generateHueGradient(
     colors.push(hexFromArgb(hct.toInt()).toUpperCase());
   }
   return colors;
+}
+
+// ────────────────────────────────────────────
+//  Tonal Palette generation
+// ────────────────────────────────────────────
+
+/** Tone steps in display order (light → dark, matching Material Theme Builder) */
+export const TONE_STEPS = [
+  100, 99, 98, 95, 90, 80, 70, 60, 50, 40, 35, 30, 25, 20, 15, 10, 5, 0,
+] as const;
+
+export type ToneStep = (typeof TONE_STEPS)[number];
+
+/** A single tonal palette: tone step → hex color */
+export type TonalPaletteData = Record<string, string>;
+
+/** All 6 tonal palettes derived from a seed + variant */
+export interface PaletteSet {
+  primary: TonalPaletteData;
+  secondary: TonalPaletteData;
+  tertiary: TonalPaletteData;
+  neutral: TonalPaletteData;
+  neutralVariant: TonalPaletteData;
+  error: TonalPaletteData;
+}
+
+/** Human-readable labels for each palette */
+export const PALETTE_LABELS: Record<string, string> = {
+  primary: "Primary",
+  secondary: "Secondary",
+  tertiary: "Tertiary",
+  neutral: "Neutral",
+  neutralVariant: "Neutral Variant",
+  error: "Error",
+};
+
+/** The palette keys in display order */
+export const PALETTE_KEYS = [
+  "primary",
+  "secondary",
+  "tertiary",
+  "neutral",
+  "neutralVariant",
+  "error",
+] as const;
+
+/** Extract a TonalPaletteData from a MCU TonalPalette */
+function extractPaletteData(palette: TonalPalette): TonalPaletteData {
+  const data: TonalPaletteData = {};
+  for (const tone of TONE_STEPS) {
+    data[String(tone)] = hexFromArgb(palette.tone(tone)).toUpperCase();
+  }
+  return data;
+}
+
+/**
+ * Generate all 6 tonal palettes from a hex seed and scheme variant.
+ * Uses the scheme's palette accessors (primaryPalette, secondaryPalette, etc.)
+ * so the palettes reflect the variant's hue/chroma mappings.
+ */
+export function generateTonalPalettes(
+  seedHex: string,
+  variant: SchemeVariant = "tonal-spot"
+): PaletteSet {
+  const normalized = seedHex.startsWith("#") ? seedHex : `#${seedHex}`;
+  const argb = argbFromHex(normalized);
+  const hct = Hct.fromInt(argb);
+  const Constructor = SCHEME_CONSTRUCTORS[variant];
+  // Palettes are the same regardless of dark/light, use light + standard contrast
+  const scheme = new Constructor(hct, false, 0.0) as any;
+
+  return {
+    primary: extractPaletteData(scheme.primaryPalette),
+    secondary: extractPaletteData(scheme.secondaryPalette),
+    tertiary: extractPaletteData(scheme.tertiaryPalette),
+    neutral: extractPaletteData(scheme.neutralPalette),
+    neutralVariant: extractPaletteData(scheme.neutralVariantPalette),
+    error: extractPaletteData(scheme.errorPalette),
+  };
 }

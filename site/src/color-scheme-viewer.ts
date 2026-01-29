@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import {
   generateScheme,
   generateVariantPreviews,
+  generateTonalPalettes,
   isValidHex,
   hexToHCT,
   hctToHex,
@@ -10,10 +11,14 @@ import {
   SCHEME_VARIANTS,
   VARIANT_LABELS,
   COLOR_FORMATS,
+  TONE_STEPS,
+  PALETTE_KEYS,
+  PALETTE_LABELS,
   type SchemeColors,
   type SchemeVariant,
   type VariantPreview,
   type ColorFormat,
+  type PaletteSet,
 } from "./theme-generator.js";
 
 /**
@@ -35,6 +40,9 @@ export class ColorSchemeViewer extends LitElement {
   @state() private _variantPreviews: VariantPreview[] = [];
   @state() private _copiedCommand = false;
   @state() private _copiedSwatch = "";
+
+  // Tonal palettes — derived from seed + variant
+  @state() private _palettes: PaletteSet | null = null;
 
   // HCT state — derived from seed, drives the hue slider
   @state() private _hue = 0;
@@ -588,6 +596,82 @@ export class ColorSchemeViewer extends LitElement {
       transition: var(--transition-color);
     }
 
+    /* ─── Tonal Palettes ─── */
+    .palettes-section {
+      margin-top: 40px;
+    }
+
+    .palettes-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .palettes-header h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--on-surface, #1d1b20);
+    }
+
+    .palette-row {
+      margin-bottom: 24px;
+    }
+
+    .palette-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .palette-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--on-surface-variant, #666);
+      margin-bottom: 8px;
+      transition: var(--transition-color);
+    }
+
+    .palette-strip {
+      display: grid;
+      grid-template-columns: repeat(18, 1fr);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .tone-swatch {
+      aspect-ratio: 1 / 1.4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      transition: opacity 0.1s ease;
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    }
+
+    .tone-swatch:hover {
+      opacity: 0.88;
+    }
+
+    .tone-swatch .copied-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      pointer-events: none;
+      white-space: nowrap;
+      animation: fade-out 1s ease forwards;
+    }
+
     /* ─── Responsive ─── */
     @media (max-width: 960px) {
       .layout {
@@ -606,6 +690,14 @@ export class ColorSchemeViewer extends LitElement {
       .surface-row.five {
         grid-template-columns: repeat(3, 1fr);
       }
+
+      .palette-strip {
+        grid-template-columns: repeat(9, 1fr);
+      }
+
+      .tone-swatch {
+        aspect-ratio: 1 / 1;
+      }
     }
 
     @media (max-width: 600px) {
@@ -622,6 +714,15 @@ export class ColorSchemeViewer extends LitElement {
 
       .variant-grid {
         grid-template-columns: repeat(4, 1fr);
+      }
+
+      .palette-strip {
+        grid-template-columns: repeat(6, 1fr);
+      }
+
+      .tone-swatch {
+        aspect-ratio: 1 / 1;
+        font-size: 9px;
       }
     }
   `;
@@ -656,6 +757,7 @@ export class ColorSchemeViewer extends LitElement {
 
     this._colors = generateScheme(hex, this._variant, this._isDark);
     this._variantPreviews = generateVariantPreviews(hex, this._isDark);
+    this._palettes = generateTonalPalettes(hex, this._variant);
 
     // Decompose seed into HCT for the hue slider
     const hct = hexToHCT(hex);
@@ -702,6 +804,7 @@ export class ColorSchemeViewer extends LitElement {
     // Regenerate scheme but skip re-decomposing HCT (we already have correct values)
     this._colors = generateScheme(newHex, this._variant, this._isDark);
     this._variantPreviews = generateVariantPreviews(newHex, this._isDark);
+    this._palettes = generateTonalPalettes(newHex, this._variant);
     this._applyTokens();
     this._syncDarkAttribute();
   }
@@ -1094,6 +1197,55 @@ export class ColorSchemeViewer extends LitElement {
               </div>
             </div>
           </div>
+
+          <!-- ═══ Tonal Palettes ═══ -->
+          ${this._palettes
+            ? html`
+                <div class="palettes-section">
+                  <div class="palettes-header">
+                    <h2>Tonal Palettes</h2>
+                  </div>
+                  ${PALETTE_KEYS.map(
+                    (key) => html`
+                      <div class="palette-row">
+                        <div class="palette-label">
+                          ${PALETTE_LABELS[key]}
+                        </div>
+                        <div class="palette-strip">
+                          ${TONE_STEPS.map((tone) => {
+                            const hex =
+                              this._palettes![
+                                key as keyof PaletteSet
+                              ][String(tone)];
+                            const isLight = tone >= 50;
+                            const textColor = isLight
+                              ? "rgba(0,0,0,0.6)"
+                              : "rgba(255,255,255,0.8)";
+                            const copyKey = `${key}-${tone}`;
+                            return html`
+                              <div
+                                class="tone-swatch"
+                                style="background:${hex};color:${textColor}"
+                                @click=${() =>
+                                  this._copySwatchHex(copyKey, hex)}
+                                title="${PALETTE_LABELS[key]} ${tone} — ${hex}"
+                              >
+                                ${tone}
+                                ${this._copiedSwatch === copyKey
+                                  ? html`<span class="copied-indicator"
+                                      >Copied</span
+                                    >`
+                                  : nothing}
+                              </div>
+                            `;
+                          })}
+                        </div>
+                      </div>
+                    `
+                  )}
+                </div>
+              `
+            : nothing}
         </div>
 
         <!-- ═══ RIGHT: Configurator sidebar ═══ -->
