@@ -11,6 +11,8 @@ package-lock.json
 
 # dependencies
 /node_modules
+/site/node_modules
+/site/dist
 /.pnp
 .pnp.js
 
