@@ -17,6 +17,14 @@
             --page-text: #e6e0e9;
         }
 
+        /* Pre-JS flash prevention: respect system preference immediately */
+        @media (prefers-color-scheme: dark) {
+            :root:not(.light-override) {
+                --page-bg: #141218;
+                --page-text: #e6e0e9;
+            }
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -32,7 +40,7 @@
         }
 
         .page-shell {
-            max-width: 1280px;
+            max-width: 1440px;
             margin: 0 auto;
             padding: 32px 40px;
         }
@@ -77,15 +85,5 @@
         </p>
     </noscript>
     <script type="module" src="/src/color-scheme-viewer.ts"></script>
-    <script>
-        // Sync body dark class with the component's dark attribute
-        const viewer = document.querySelector('color-scheme-viewer');
-        if (viewer) {
-            const observer = new MutationObserver(() => {
-                document.body.classList.toggle('dark', viewer.hasAttribute('dark'));
-            });
-            observer.observe(viewer, { attributes: true, attributeFilter: ['dark'] });
-        }
-    </script>
 </body>
 </html>

@@ -45,13 +45,17 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
  * Visual configurator for the design-tokens CLI.
  * Self-themed: the entire UI uses the generated M3 tokens.
  */
+type ThemePreference = "system" | "light" | "dark";
+
 @customElement("color-scheme-viewer")
 export class ColorSchemeViewer extends LitElement {
   @property({ type: String }) seed = "#769CDF";
 
   @state() private _variant: SchemeVariant = "tonal-spot";
-  @state() private _isDark = false;
-  @state() private _colors: SchemeColors | null = null;
+  @state() private _themePreference: ThemePreference = "system";
+  @state() private _systemIsDark = false;
+  @state() private _lightColors: SchemeColors | null = null;
+  @state() private _darkColors: SchemeColors | null = null;
   @state() private _hexInput = "#769CDF";
   @state() private _format: ColorFormat = "oklch";
   @state() private _outputDir = "./tokens";
@@ -59,9 +63,9 @@ export class ColorSchemeViewer extends LitElement {
   @state() private _copiedCommand = false;
   @state() private _copiedSwatch = "";
 
-  // Tonal palettes — derived from seed + variant (cached across light/dark toggle)
+  // Tonal palettes — derived from seed + variant (cached, mode-independent)
   @state() private _palettes: PaletteSet | null = null;
-  private _palettesCacheKey = ""; // "seed|variant" — skip recomputation on mode toggle
+  private _palettesCacheKey = "";
 
   // HCT state — derived from seed, drives the hue slider
   @state() private _hue = 0;
@@ -71,6 +75,20 @@ export class ColorSchemeViewer extends LitElement {
 
   // Debounced regeneration for continuous input (slider, typing)
   private _debouncedRegenerate = debounce(() => this._regenerate(), 16);
+
+  // System prefers-color-scheme media query
+  private _darkMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  private _onSystemThemeChange = (e: MediaQueryListEvent) => {
+    this._systemIsDark = e.matches;
+    this._applyTokens();
+    this._applyPageTheme();
+  };
+
+  /** Resolved dark state for the page chrome (sidebar, background) */
+  private get _resolvedDark(): boolean {
+    if (this._themePreference === "system") return this._systemIsDark;
+    return this._themePreference === "dark";
+  }
 
   // ────────────────────────────────────────────
   //  Styles — self-themed via CSS custom properties
@@ -99,45 +117,69 @@ export class ColorSchemeViewer extends LitElement {
       outline-offset: 2px;
     }
 
-    /* ─── Two-column layout ─── */
+    /* ─── Two-column layout: sidebar LEFT, preview RIGHT ─── */
     .layout {
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 340px 1fr;
       gap: 32px;
       align-items: start;
     }
 
-    /* ─── Left: Swatch preview ─── */
+    /* ─── Right: Dual scheme preview ─── */
     .preview {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
     }
 
-    .preview-header {
+    /* ─── Scheme containers (light / dark) ─── */
+    .scheme-container {
+      border-radius: 20px;
+      padding: 24px;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .scheme-container--light {
+      background: #fef7ff;
+      color: #1d1b20;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    }
+
+    .scheme-container--dark {
+      background: #141218;
+      color: #e6e0e9;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .scheme-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
+      gap: 10px;
+      margin-bottom: 20px;
     }
 
-    .preview-header h2 {
+    .scheme-header h2 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 500;
-      color: var(--on-surface, #1d1b20);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
 
-    .mode-badge {
-      display: inline-flex;
+    .scheme-header-icon {
+      display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 100px;
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: 0.3px;
-      background: var(--secondary-container, #e0e0e0);
-      color: var(--on-secondary-container, #333);
-      transition: var(--transition-color);
+      opacity: 0.6;
+    }
+
+    .scheme-container--light .section-label {
+      background: #f5eefa;
+      color: #49454f;
+    }
+
+    .scheme-container--dark .section-label {
+      background: #1d1a22;
+      color: #cac4d0;
     }
 
     /* ─── Swatch grid ─── */
@@ -243,7 +285,7 @@ export class ColorSchemeViewer extends LitElement {
       grid-template-columns: repeat(2, 1fr);
     }
 
-    /* ─── Right: Sidebar configurator ─── */
+    /* ─── Left: Sidebar configurator ─── */
     .sidebar {
       position: sticky;
       top: 24px;
@@ -255,6 +297,10 @@ export class ColorSchemeViewer extends LitElement {
       overflow: hidden;
       border: 1px solid var(--outline-variant, #ddd);
       transition: var(--transition-color);
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--outline-variant, #ddd) transparent;
     }
 
     .sidebar-section {
@@ -402,23 +448,17 @@ export class ColorSchemeViewer extends LitElement {
       border-radius: 6px;
     }
 
-    /* ─── Mode toggle (light/dark) ─── */
-    .mode-toggle {
-      display: flex;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 2px solid var(--outline-variant, #ddd);
-      transition: var(--transition-color);
-    }
-
-    .mode-btn {
-      flex: 1;
+    /* ─── Theme toggle (system / light / dark cycle) ─── */
+    .theme-toggle {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
+      gap: 10px;
+      width: 100%;
       padding: 10px 16px;
-      border: none;
+      border-radius: 12px;
+      border: 2px solid var(--outline-variant, #ddd);
+      background: var(--surface-container-high, #e8e8e8);
+      color: var(--on-surface, #1d1b20);
       cursor: pointer;
       font-size: 13px;
       font-weight: 600;
@@ -426,23 +466,25 @@ export class ColorSchemeViewer extends LitElement {
       transition: var(--transition-color);
     }
 
-    .mode-btn .icon {
-      font-size: 16px;
-      line-height: 1;
-    }
-
-    .mode-btn.active {
-      background: var(--primary, #6750a4);
-      color: var(--on-primary, #fff);
-    }
-
-    .mode-btn:not(.active) {
-      background: var(--surface-container-high, #e8e8e8);
-      color: var(--on-surface-variant, #666);
-    }
-
-    .mode-btn:not(.active):hover {
+    .theme-toggle:hover {
       background: var(--surface-container-highest, #e0e0e0);
+      border-color: var(--outline, #bbb);
+    }
+
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--primary, #6750a4);
+      outline-offset: 2px;
+    }
+
+    .theme-toggle-icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .theme-toggle-label {
+      flex: 1;
+      text-align: left;
     }
 
     /* ─── Variant selector cards ─── */
@@ -702,6 +744,17 @@ export class ColorSchemeViewer extends LitElement {
     }
 
     /* ─── Responsive ─── */
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 300px 1fr;
+        gap: 24px;
+      }
+
+      .scheme-container {
+        padding: 20px;
+      }
+    }
+
     @media (max-width: 960px) {
       .layout {
         grid-template-columns: 1fr;
@@ -710,6 +763,8 @@ export class ColorSchemeViewer extends LitElement {
       .sidebar {
         position: static;
         order: -1;
+        max-height: none;
+        overflow-y: visible;
       }
 
       .scheme-grid {
@@ -730,6 +785,11 @@ export class ColorSchemeViewer extends LitElement {
     }
 
     @media (max-width: 600px) {
+      .scheme-container {
+        padding: 16px;
+        border-radius: 16px;
+      }
+
       .scheme-grid {
         grid-template-columns: 1fr;
       }
@@ -763,7 +823,14 @@ export class ColorSchemeViewer extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this._hexInput = this.seed;
+    this._systemIsDark = this._darkMediaQuery.matches;
+    this._darkMediaQuery.addEventListener("change", this._onSystemThemeChange);
     this._regenerate();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._darkMediaQuery.removeEventListener("change", this._onSystemThemeChange);
   }
 
   updated(changed: Map<string, unknown>) {
@@ -784,11 +851,14 @@ export class ColorSchemeViewer extends LitElement {
       ? this._hexInput.toUpperCase()
       : `#${this._hexInput.toUpperCase()}`;
 
-    this._colors = generateScheme(hex, this._variant, this._isDark);
-    this._variantPreviews = generateVariantPreviews(hex, this._isDark);
+    // Generate BOTH light and dark schemes
+    this._lightColors = generateScheme(hex, this._variant, false);
+    this._darkColors = generateScheme(hex, this._variant, true);
+
+    // Variant previews — use light mode for the sidebar preview dots
+    this._variantPreviews = generateVariantPreviews(hex, false);
 
     // Only recompute tonal palettes when seed or variant actually changes
-    // (palettes are tone-independent, so dark/light toggle doesn't affect them)
     const paletteCacheKey = `${hex}|${this._variant}`;
     if (this._palettesCacheKey !== paletteCacheKey) {
       this._palettes = generateTonalPalettes(hex, this._variant);
@@ -803,7 +873,7 @@ export class ColorSchemeViewer extends LitElement {
     this._updateHueGradient();
 
     this._applyTokens();
-    this._syncDarkAttribute();
+    this._applyPageTheme();
   }
 
   // ────────────────────────────────────────────
@@ -846,10 +916,13 @@ export class ColorSchemeViewer extends LitElement {
     this._hueGradient = `linear-gradient(to right, ${stops.join(", ")})`;
   }
 
-  /** Apply M3 tokens as CSS custom properties on the host */
+  /**
+   * Apply M3 tokens as CSS custom properties on the host.
+   * Uses the resolved theme (system/light/dark) to style the sidebar chrome.
+   */
   private _applyTokens() {
-    if (!this._colors) return;
-    const c = this._colors;
+    const c = this._resolvedDark ? this._darkColors : this._lightColors;
+    if (!c) return;
     const props: Record<string, string> = {
       "--primary": c.primary,
       "--on-primary": c.onPrimary,
@@ -891,13 +964,15 @@ export class ColorSchemeViewer extends LitElement {
     }
   }
 
-  /** Sync the dark attribute for external body styling */
-  private _syncDarkAttribute() {
-    if (this._isDark) {
+  /** Sync page body class and dark attribute based on resolved theme */
+  private _applyPageTheme() {
+    const dark = this._resolvedDark;
+    if (dark) {
       this.setAttribute("dark", "");
     } else {
       this.removeAttribute("dark");
     }
+    document.body.classList.toggle("dark", dark);
   }
 
   private _selectVariant(v: SchemeVariant) {
@@ -905,9 +980,12 @@ export class ColorSchemeViewer extends LitElement {
     this._regenerate();
   }
 
-  private _setMode(dark: boolean) {
-    this._isDark = dark;
-    this._regenerate();
+  private _cycleTheme() {
+    const order: ThemePreference[] = ["system", "light", "dark"];
+    const idx = order.indexOf(this._themePreference);
+    this._themePreference = order[(idx + 1) % order.length];
+    this._applyTokens();
+    this._applyPageTheme();
   }
 
   private _selectFormat(f: ColorFormat) {
@@ -975,15 +1053,17 @@ export class ColorSchemeViewer extends LitElement {
   // ────────────────────────────────────────────
 
   private _swatch(
+    colors: SchemeColors,
+    prefix: string,
     name: string,
     bgKey: keyof SchemeColors,
     fgKey: keyof SchemeColors,
     large = false
   ) {
-    if (!this._colors) return nothing;
-    const bg = this._colors[bgKey];
-    const fg = this._colors[fgKey];
-    const isCopied = this._copiedSwatch === bgKey;
+    const bg = colors[bgKey];
+    const fg = colors[fgKey];
+    const copyKey = `${prefix}-${bgKey}`;
+    const isCopied = this._copiedSwatch === copyKey;
     return html`
       <div
         class="swatch ${large ? "large" : ""}"
@@ -991,8 +1071,8 @@ export class ColorSchemeViewer extends LitElement {
         role="button"
         tabindex="0"
         aria-label="${name}: ${bg}. Click to copy."
-        @click=${() => this._copySwatchHex(bgKey, bg)}
-        @keydown=${onActivate(() => this._copySwatchHex(bgKey, bg))}
+        @click=${() => this._copySwatchHex(copyKey, bg)}
+        @keydown=${onActivate(() => this._copySwatchHex(copyKey, bg))}
         title="Click to copy ${bg}"
       >
         <span class="token-name">${name}</span>
@@ -1004,11 +1084,16 @@ export class ColorSchemeViewer extends LitElement {
     `;
   }
 
-  private _surfaceSwatch(name: string, bgKey: keyof SchemeColors) {
-    if (!this._colors) return nothing;
-    const bg = this._colors[bgKey];
-    const fg = this._colors.onSurface;
-    const isCopied = this._copiedSwatch === bgKey;
+  private _surfaceSwatch(
+    colors: SchemeColors,
+    prefix: string,
+    name: string,
+    bgKey: keyof SchemeColors
+  ) {
+    const bg = colors[bgKey];
+    const fg = colors.onSurface;
+    const copyKey = `${prefix}-${bgKey}`;
+    const isCopied = this._copiedSwatch === copyKey;
     return html`
       <div
         class="swatch"
@@ -1016,8 +1101,8 @@ export class ColorSchemeViewer extends LitElement {
         role="button"
         tabindex="0"
         aria-label="${name}: ${bg}. Click to copy."
-        @click=${() => this._copySwatchHex(bgKey, bg)}
-        @keydown=${onActivate(() => this._copySwatchHex(bgKey, bg))}
+        @click=${() => this._copySwatchHex(copyKey, bg)}
+        @keydown=${onActivate(() => this._copySwatchHex(copyKey, bg))}
         title="Click to copy ${bg}"
       >
         <span class="token-name">${name}</span>
@@ -1025,6 +1110,149 @@ export class ColorSchemeViewer extends LitElement {
         ${isCopied
           ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
           : nothing}
+      </div>
+    `;
+  }
+
+  /** Swatch with a fixed (non-token) foreground color, e.g. white on scrim/shadow */
+  private _fixedFgSwatch(
+    colors: SchemeColors,
+    prefix: string,
+    name: string,
+    bgKey: keyof SchemeColors,
+    fg: string
+  ) {
+    const bg = colors[bgKey];
+    const copyKey = `${prefix}-${bgKey}`;
+    const isCopied = this._copiedSwatch === copyKey;
+    return html`
+      <div
+        class="swatch"
+        role="button"
+        tabindex="0"
+        aria-label="${name}: ${bg}. Click to copy."
+        style="background:${bg};color:${fg}"
+        @click=${() => this._copySwatchHex(copyKey, bg)}
+        @keydown=${onActivate(() => this._copySwatchHex(copyKey, bg))}
+        title="Click to copy ${bg}"
+      >
+        <span class="token-name">${name}</span>
+        <span class="hex-value">${bg}</span>
+        ${isCopied
+          ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
+          : nothing}
+      </div>
+    `;
+  }
+
+  /** Inline swatch used in the On Surface & Outline / Inverse sections */
+  private _inlineSwatch(
+    colors: SchemeColors,
+    prefix: string,
+    name: string,
+    bgKey: keyof SchemeColors,
+    fgKey: keyof SchemeColors
+  ) {
+    const bg = colors[bgKey];
+    const fg = colors[fgKey];
+    const copyKey = `${prefix}-${bgKey}`;
+    const isCopied = this._copiedSwatch === copyKey;
+    return html`
+      <div
+        class="swatch"
+        role="button"
+        tabindex="0"
+        aria-label="${name}: ${bg}. Click to copy."
+        style="background:${bg};color:${fg}"
+        @click=${() => this._copySwatchHex(copyKey, bg)}
+        @keydown=${onActivate(() => this._copySwatchHex(copyKey, bg))}
+        title="Click to copy ${bg}"
+      >
+        <span class="token-name">${name}</span>
+        <span class="hex-value">${bg}</span>
+        ${isCopied
+          ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
+          : nothing}
+      </div>
+    `;
+  }
+
+  /**
+   * Render a full scheme swatch grid. Called once for light, once for dark.
+   * @param colors  The generated scheme colors
+   * @param prefix  Unique prefix for copy-key namespacing ("light" or "dark")
+   */
+  private _renderSchemeGrid(colors: SchemeColors, prefix: string) {
+    const s = (name: string, bg: keyof SchemeColors, fg: keyof SchemeColors, large = false) =>
+      this._swatch(colors, prefix, name, bg, fg, large);
+    const ss = (name: string, bg: keyof SchemeColors) =>
+      this._surfaceSwatch(colors, prefix, name, bg);
+    const is = (name: string, bg: keyof SchemeColors, fg: keyof SchemeColors) =>
+      this._inlineSwatch(colors, prefix, name, bg, fg);
+
+    return html`
+      <div class="scheme-grid">
+        <!-- Primary family -->
+        <div class="section-label">Primary</div>
+        ${s("Primary", "primary", "onPrimary", true)}
+        ${s("On Primary", "onPrimary", "primary")}
+        ${s("Primary Container", "primaryContainer", "onPrimaryContainer", true)}
+        ${s("On Primary Container", "onPrimaryContainer", "primaryContainer")}
+
+        <!-- Secondary family -->
+        <div class="section-label">Secondary</div>
+        ${s("Secondary", "secondary", "onSecondary", true)}
+        ${s("On Secondary", "onSecondary", "secondary")}
+        ${s("Secondary Container", "secondaryContainer", "onSecondaryContainer", true)}
+        ${s("On Secondary Container", "onSecondaryContainer", "secondaryContainer")}
+
+        <!-- Tertiary family -->
+        <div class="section-label">Tertiary</div>
+        ${s("Tertiary", "tertiary", "onTertiary", true)}
+        ${s("On Tertiary", "onTertiary", "tertiary")}
+        ${s("Tertiary Container", "tertiaryContainer", "onTertiaryContainer", true)}
+        ${s("On Tertiary Container", "onTertiaryContainer", "tertiaryContainer")}
+
+        <!-- Error family -->
+        <div class="section-label">Error</div>
+        ${s("Error", "error", "onError", true)}
+        ${s("On Error", "onError", "error")}
+        ${s("Error Container", "errorContainer", "onErrorContainer", true)}
+        ${s("On Error Container", "onErrorContainer", "errorContainer")}
+
+        <!-- Surface hierarchy -->
+        <div class="section-label">Surface</div>
+        <div class="surface-row">
+          ${ss("Surface Dim", "surfaceDim")}
+          ${ss("Surface", "surface")}
+          ${ss("Surface Bright", "surfaceBright")}
+        </div>
+        <div class="surface-row five">
+          ${ss("Container Lowest", "surfaceContainerLowest")}
+          ${ss("Container Low", "surfaceContainerLow")}
+          ${ss("Container", "surfaceContainer")}
+          ${ss("Container High", "surfaceContainerHigh")}
+          ${ss("Container Highest", "surfaceContainerHighest")}
+        </div>
+
+        <!-- On Surface / Outline -->
+        <div class="section-label">On Surface & Outline</div>
+        <div class="surface-row four">
+          ${is("On Surface", "onSurface", "surface")}
+          ${is("On Surface Variant", "onSurfaceVariant", "surface")}
+          ${is("Outline", "outline", "surface")}
+          ${is("Outline Variant", "outlineVariant", "onSurfaceVariant")}
+        </div>
+
+        <!-- Inverse + Utility -->
+        <div class="section-label">Inverse & Utility</div>
+        ${is("Inverse Surface", "inverseSurface", "inverseOnSurface")}
+        ${is("Inverse On Surface", "inverseOnSurface", "inverseSurface")}
+        ${is("Inverse Primary", "inversePrimary", "primary")}
+        <div class="surface-row two">
+          ${this._fixedFgSwatch(colors, prefix, "Scrim", "scrim", "#FFFFFF")}
+          ${this._fixedFgSwatch(colors, prefix, "Shadow", "shadow", "#FFFFFF")}
+        </div>
       </div>
     `;
   }
@@ -1034,323 +1262,21 @@ export class ColorSchemeViewer extends LitElement {
   // ────────────────────────────────────────────
 
   render() {
-    if (!this._colors) return html`<p>Loading...</p>`;
-    const c = this._colors;
+    if (!this._lightColors || !this._darkColors) return html`<p>Loading...</p>`;
+
+    // SVG icons for the theme toggle
+    const sunIcon = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+    const moonIcon = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
+    const monitorIcon = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+
+    const themeIcon = this._themePreference === "system" ? monitorIcon
+      : this._themePreference === "light" ? sunIcon : moonIcon;
+    const themeLabel = this._themePreference === "system" ? "System"
+      : this._themePreference === "light" ? "Light" : "Dark";
 
     return html`
       <div class="layout">
-        <!-- ═══ LEFT: Color scheme preview ═══ -->
-        <div class="preview">
-          <div class="preview-header">
-            <h2>Color Scheme</h2>
-            <span class="mode-badge">
-              ${this._isDark ? "\u{263E}" : "\u{2600}"}
-              ${this._isDark ? "Dark" : "Light"}
-            </span>
-          </div>
-
-          <div class="scheme-grid">
-            <!-- Primary family -->
-            <div class="section-label">Primary</div>
-            ${this._swatch("Primary", "primary", "onPrimary", true)}
-            ${this._swatch("On Primary", "onPrimary", "primary")}
-            ${this._swatch(
-              "Primary Container",
-              "primaryContainer",
-              "onPrimaryContainer",
-              true
-            )}
-            ${this._swatch(
-              "On Primary Container",
-              "onPrimaryContainer",
-              "primaryContainer"
-            )}
-
-            <!-- Secondary family -->
-            <div class="section-label">Secondary</div>
-            ${this._swatch("Secondary", "secondary", "onSecondary", true)}
-            ${this._swatch("On Secondary", "onSecondary", "secondary")}
-            ${this._swatch(
-              "Secondary Container",
-              "secondaryContainer",
-              "onSecondaryContainer",
-              true
-            )}
-            ${this._swatch(
-              "On Secondary Container",
-              "onSecondaryContainer",
-              "secondaryContainer"
-            )}
-
-            <!-- Tertiary family -->
-            <div class="section-label">Tertiary</div>
-            ${this._swatch("Tertiary", "tertiary", "onTertiary", true)}
-            ${this._swatch("On Tertiary", "onTertiary", "tertiary")}
-            ${this._swatch(
-              "Tertiary Container",
-              "tertiaryContainer",
-              "onTertiaryContainer",
-              true
-            )}
-            ${this._swatch(
-              "On Tertiary Container",
-              "onTertiaryContainer",
-              "tertiaryContainer"
-            )}
-
-            <!-- Error family -->
-            <div class="section-label">Error</div>
-            ${this._swatch("Error", "error", "onError", true)}
-            ${this._swatch("On Error", "onError", "error")}
-            ${this._swatch(
-              "Error Container",
-              "errorContainer",
-              "onErrorContainer",
-              true
-            )}
-            ${this._swatch(
-              "On Error Container",
-              "onErrorContainer",
-              "errorContainer"
-            )}
-
-            <!-- Surface hierarchy -->
-            <div class="section-label">Surface</div>
-            <div class="surface-row">
-              ${this._surfaceSwatch("Surface Dim", "surfaceDim")}
-              ${this._surfaceSwatch("Surface", "surface")}
-              ${this._surfaceSwatch("Surface Bright", "surfaceBright")}
-            </div>
-
-            <div class="surface-row five">
-              ${this._surfaceSwatch("Container Lowest", "surfaceContainerLowest")}
-              ${this._surfaceSwatch("Container Low", "surfaceContainerLow")}
-              ${this._surfaceSwatch("Container", "surfaceContainer")}
-              ${this._surfaceSwatch("Container High", "surfaceContainerHigh")}
-              ${this._surfaceSwatch(
-                "Container Highest",
-                "surfaceContainerHighest"
-              )}
-            </div>
-
-            <!-- On Surface / Outline -->
-            <div class="section-label">On Surface & Outline</div>
-            <div class="surface-row four">
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="On Surface: ${c.onSurface}. Click to copy."
-                style="background:${c.onSurface};color:${c.surface}"
-                @click=${() => this._copySwatchHex("onSurface", c.onSurface)}
-                @keydown=${onActivate(() => this._copySwatchHex("onSurface", c.onSurface))}
-                title="Click to copy ${c.onSurface}"
-              >
-                <span class="token-name">On Surface</span>
-                <span class="hex-value">${c.onSurface}</span>
-                ${this._copiedSwatch === "onSurface"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="On Surface Variant: ${c.onSurfaceVariant}. Click to copy."
-                style="background:${c.onSurfaceVariant};color:${c.surface}"
-                @click=${() =>
-                  this._copySwatchHex("onSurfaceVariant", c.onSurfaceVariant)}
-                @keydown=${onActivate(() => this._copySwatchHex("onSurfaceVariant", c.onSurfaceVariant))}
-                title="Click to copy ${c.onSurfaceVariant}"
-              >
-                <span class="token-name">On Surface Variant</span>
-                <span class="hex-value">${c.onSurfaceVariant}</span>
-                ${this._copiedSwatch === "onSurfaceVariant"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="Outline: ${c.outline}. Click to copy."
-                style="background:${c.outline};color:${c.surface}"
-                @click=${() => this._copySwatchHex("outline", c.outline)}
-                @keydown=${onActivate(() => this._copySwatchHex("outline", c.outline))}
-                title="Click to copy ${c.outline}"
-              >
-                <span class="token-name">Outline</span>
-                <span class="hex-value">${c.outline}</span>
-                ${this._copiedSwatch === "outline"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="Outline Variant: ${c.outlineVariant}. Click to copy."
-                style="background:${c.outlineVariant};color:${c.onSurfaceVariant}"
-                @click=${() =>
-                  this._copySwatchHex("outlineVariant", c.outlineVariant)}
-                @keydown=${onActivate(() => this._copySwatchHex("outlineVariant", c.outlineVariant))}
-                title="Click to copy ${c.outlineVariant}"
-              >
-                <span class="token-name">Outline Variant</span>
-                <span class="hex-value">${c.outlineVariant}</span>
-                ${this._copiedSwatch === "outlineVariant"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-            </div>
-
-            <!-- Inverse + Utility -->
-            <div class="section-label">Inverse & Utility</div>
-            <div
-              class="swatch"
-              role="button"
-              tabindex="0"
-              aria-label="Inverse Surface: ${c.inverseSurface}. Click to copy."
-              style="background:${c.inverseSurface};color:${c.inverseOnSurface}"
-              @click=${() =>
-                this._copySwatchHex("inverseSurface", c.inverseSurface)}
-              @keydown=${onActivate(() => this._copySwatchHex("inverseSurface", c.inverseSurface))}
-              title="Click to copy ${c.inverseSurface}"
-            >
-              <span class="token-name">Inverse Surface</span>
-              <span class="hex-value">${c.inverseSurface}</span>
-              ${this._copiedSwatch === "inverseSurface"
-                ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                : nothing}
-            </div>
-            <div
-              class="swatch"
-              role="button"
-              tabindex="0"
-              aria-label="Inverse On Surface: ${c.inverseOnSurface}. Click to copy."
-              style="background:${c.inverseOnSurface};color:${c.inverseSurface}"
-              @click=${() =>
-                this._copySwatchHex("inverseOnSurface", c.inverseOnSurface)}
-              @keydown=${onActivate(() => this._copySwatchHex("inverseOnSurface", c.inverseOnSurface))}
-              title="Click to copy ${c.inverseOnSurface}"
-            >
-              <span class="token-name">Inverse On Surface</span>
-              <span class="hex-value">${c.inverseOnSurface}</span>
-              ${this._copiedSwatch === "inverseOnSurface"
-                ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                : nothing}
-            </div>
-            <div
-              class="swatch"
-              role="button"
-              tabindex="0"
-              aria-label="Inverse Primary: ${c.inversePrimary}. Click to copy."
-              style="background:${c.inversePrimary};color:${c.primary}"
-              @click=${() =>
-                this._copySwatchHex("inversePrimary", c.inversePrimary)}
-              @keydown=${onActivate(() => this._copySwatchHex("inversePrimary", c.inversePrimary))}
-              title="Click to copy ${c.inversePrimary}"
-            >
-              <span class="token-name">Inverse Primary</span>
-              <span class="hex-value">${c.inversePrimary}</span>
-              ${this._copiedSwatch === "inversePrimary"
-                ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                : nothing}
-            </div>
-            <div class="surface-row two">
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="Scrim: ${c.scrim}. Click to copy."
-                style="background:${c.scrim};color:white"
-                @click=${() => this._copySwatchHex("scrim", c.scrim)}
-                @keydown=${onActivate(() => this._copySwatchHex("scrim", c.scrim))}
-                title="Click to copy ${c.scrim}"
-              >
-                <span class="token-name">Scrim</span>
-                <span class="hex-value">${c.scrim}</span>
-                ${this._copiedSwatch === "scrim"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-              <div
-                class="swatch"
-                role="button"
-                tabindex="0"
-                aria-label="Shadow: ${c.shadow}. Click to copy."
-                style="background:${c.shadow};color:white"
-                @click=${() => this._copySwatchHex("shadow", c.shadow)}
-                @keydown=${onActivate(() => this._copySwatchHex("shadow", c.shadow))}
-                title="Click to copy ${c.shadow}"
-              >
-                <span class="token-name">Shadow</span>
-                <span class="hex-value">${c.shadow}</span>
-                ${this._copiedSwatch === "shadow"
-                  ? html`<span class="copied-indicator" aria-live="polite">Copied</span>`
-                  : nothing}
-              </div>
-            </div>
-          </div>
-
-          <!-- ═══ Tonal Palettes ═══ -->
-          ${this._palettes
-            ? (() => {
-                const palettes = this._palettes;
-                return html`
-                  <div class="palettes-section">
-                    <div class="palettes-header">
-                      <h2>Tonal Palettes</h2>
-                    </div>
-                    ${PALETTE_KEYS.map(
-                      (key) => html`
-                        <div class="palette-row">
-                          <div class="palette-label">
-                            ${PALETTE_LABELS[key]}
-                          </div>
-                          <div class="palette-strip" role="group" aria-label="${PALETTE_LABELS[key]} tonal palette">
-                            ${TONE_STEPS.map((tone) => {
-                              const hex =
-                                palettes[key as keyof PaletteSet][
-                                  String(tone)
-                                ];
-                              const isLight = tone >= 50;
-                              const textColor = isLight
-                                ? "rgba(0,0,0,0.6)"
-                                : "rgba(255,255,255,0.8)";
-                              const copyKey = `${key}-${tone}`;
-                              return html`
-                                <div
-                                  class="tone-swatch"
-                                  role="button"
-                                  tabindex="0"
-                                  aria-label="${PALETTE_LABELS[key]} tone ${tone}: ${hex}. Click to copy."
-                                  style="background:${hex};color:${textColor}"
-                                  @click=${() =>
-                                    this._copySwatchHex(copyKey, hex)}
-                                  @keydown=${onActivate(() => this._copySwatchHex(copyKey, hex))}
-                                  title="${PALETTE_LABELS[key]} ${tone} — ${hex}"
-                                >
-                                  ${tone}
-                                  ${this._copiedSwatch === copyKey
-                                    ? html`<span class="copied-indicator" aria-live="polite"
-                                        >Copied</span
-                                      >`
-                                    : nothing}
-                                </div>
-                              `;
-                            })}
-                          </div>
-                        </div>
-                      `
-                    )}
-                  </div>
-                `;
-              })()
-            : nothing}
-        </div>
-
-        <!-- ═══ RIGHT: Configurator sidebar ═══ -->
+        <!-- ═══ LEFT: Configurator sidebar ═══ -->
         <div class="sidebar">
           <!-- Seed color -->
           <div class="sidebar-section">
@@ -1408,27 +1334,18 @@ export class ColorSchemeViewer extends LitElement {
             </div>
           </div>
 
-          <!-- Mode toggle -->
+          <!-- Page theme toggle -->
           <div class="sidebar-section">
-            <h3 id="appearance-heading">Appearance</h3>
-            <div class="mode-toggle" role="radiogroup" aria-labelledby="appearance-heading">
-              <button
-                class="mode-btn ${!this._isDark ? "active" : ""}"
-                role="radio"
-                aria-checked=${!this._isDark}
-                @click=${() => this._setMode(false)}
-              >
-                <span class="icon" aria-hidden="true">\u{2600}\u{FE0F}</span> Light
-              </button>
-              <button
-                class="mode-btn ${this._isDark ? "active" : ""}"
-                role="radio"
-                aria-checked=${this._isDark}
-                @click=${() => this._setMode(true)}
-              >
-                <span class="icon" aria-hidden="true">\u{263E}</span> Dark
-              </button>
-            </div>
+            <h3 id="appearance-heading">Page Theme</h3>
+            <button
+              class="theme-toggle"
+              @click=${() => this._cycleTheme()}
+              aria-label="Page theme: ${themeLabel}. Click to cycle."
+              title="Page theme: ${themeLabel}"
+            >
+              <span class="theme-toggle-icon" aria-hidden="true">${themeIcon}</span>
+              <span class="theme-toggle-label">${themeLabel}</span>
+            </button>
           </div>
 
           <!-- Variant selector -->
@@ -1515,6 +1432,83 @@ export class ColorSchemeViewer extends LitElement {
             <h3>Output Structure</h3>
             <div class="file-tree">${this._renderFileTree()}</div>
           </div>
+        </div>
+
+        <!-- ═══ RIGHT: Dual scheme preview ═══ -->
+        <div class="preview">
+          <!-- Light scheme -->
+          <div class="scheme-container scheme-container--light">
+            <div class="scheme-header">
+              <span class="scheme-header-icon" aria-hidden="true">${sunIcon}</span>
+              <h2>Light</h2>
+            </div>
+            ${this._renderSchemeGrid(this._lightColors, "light")}
+          </div>
+
+          <!-- Dark scheme -->
+          <div class="scheme-container scheme-container--dark">
+            <div class="scheme-header">
+              <span class="scheme-header-icon" aria-hidden="true">${moonIcon}</span>
+              <h2>Dark</h2>
+            </div>
+            ${this._renderSchemeGrid(this._darkColors, "dark")}
+          </div>
+
+          <!-- ═══ Tonal Palettes (once, mode-independent) ═══ -->
+          ${this._palettes
+            ? (() => {
+                const palettes = this._palettes;
+                return html`
+                  <div class="palettes-section">
+                    <div class="palettes-header">
+                      <h2>Tonal Palettes</h2>
+                    </div>
+                    ${PALETTE_KEYS.map(
+                      (key) => html`
+                        <div class="palette-row">
+                          <div class="palette-label">
+                            ${PALETTE_LABELS[key]}
+                          </div>
+                          <div class="palette-strip" role="group" aria-label="${PALETTE_LABELS[key]} tonal palette">
+                            ${TONE_STEPS.map((tone) => {
+                              const hex =
+                                palettes[key as keyof PaletteSet][
+                                  String(tone)
+                                ];
+                              const isLight = tone >= 50;
+                              const textColor = isLight
+                                ? "rgba(0,0,0,0.6)"
+                                : "rgba(255,255,255,0.8)";
+                              const copyKey = `${key}-${tone}`;
+                              return html`
+                                <div
+                                  class="tone-swatch"
+                                  role="button"
+                                  tabindex="0"
+                                  aria-label="${PALETTE_LABELS[key]} tone ${tone}: ${hex}. Click to copy."
+                                  style="background:${hex};color:${textColor}"
+                                  @click=${() =>
+                                    this._copySwatchHex(copyKey, hex)}
+                                  @keydown=${onActivate(() => this._copySwatchHex(copyKey, hex))}
+                                  title="${PALETTE_LABELS[key]} ${tone} — ${hex}"
+                                >
+                                  ${tone}
+                                  ${this._copiedSwatch === copyKey
+                                    ? html`<span class="copied-indicator" aria-live="polite"
+                                        >Copied</span
+                                      >`
+                                    : nothing}
+                                </div>
+                              `;
+                            })}
+                          </div>
+                        </div>
+                      `
+                    )}
+                  </div>
+                `;
+              })()
+            : nothing}
         </div>
       </div>
     `;
