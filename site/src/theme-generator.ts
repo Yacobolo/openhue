@@ -227,3 +227,47 @@ export function isValidHex(hex: string): boolean {
 export type ColorFormat = "oklch" | "hex" | "hsl" | "rgb";
 
 export const COLOR_FORMATS: ColorFormat[] = ["oklch", "hex", "hsl", "rgb"];
+
+// ────────────────────────────────────────────
+//  HCT utilities
+// ────────────────────────────────────────────
+
+/** HCT decomposition of a color */
+export interface HCTValues {
+  hue: number;    // [0, 360)
+  chroma: number; // [0, ~150] — depends on hue+tone
+  tone: number;   // [0, 100]
+}
+
+/** Decompose a hex color into HCT components */
+export function hexToHCT(hex: string): HCTValues {
+  const normalized = hex.startsWith("#") ? hex : `#${hex}`;
+  const argb = argbFromHex(normalized);
+  const hct = Hct.fromInt(argb);
+  return { hue: hct.hue, chroma: hct.chroma, tone: hct.tone };
+}
+
+/** Construct a hex color from HCT components */
+export function hctToHex(hue: number, chroma: number, tone: number): string {
+  const hct = Hct.from(hue, chroma, tone);
+  return hexFromArgb(hct.toInt()).toUpperCase();
+}
+
+/**
+ * Generate a hue gradient as an array of hex color stops.
+ * Keeps chroma and tone fixed (from the primary color) while sweeping hue 0-360.
+ * This shows the user what the primary would look like at every hue.
+ */
+export function generateHueGradient(
+  chroma: number,
+  tone: number,
+  steps: number = 36
+): string[] {
+  const colors: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const hue = (i / steps) * 360;
+    const hct = Hct.from(hue, chroma, tone);
+    colors.push(hexFromArgb(hct.toInt()).toUpperCase());
+  }
+  return colors;
+}

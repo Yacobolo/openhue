@@ -4,6 +4,9 @@ import {
   generateScheme,
   generateVariantPreviews,
   isValidHex,
+  hexToHCT,
+  hctToHex,
+  generateHueGradient,
   SCHEME_VARIANTS,
   VARIANT_LABELS,
   COLOR_FORMATS,
@@ -32,6 +35,12 @@ export class ColorSchemeViewer extends LitElement {
   @state() private _variantPreviews: VariantPreview[] = [];
   @state() private _copiedCommand = false;
   @state() private _copiedSwatch = "";
+
+  // HCT state — derived from seed, drives the hue slider
+  @state() private _hue = 0;
+  @state() private _chroma = 0;
+  @state() private _tone = 0;
+  @state() private _hueGradient = "";
 
   // ────────────────────────────────────────────
   //  Styles — self-themed via CSS custom properties
@@ -276,6 +285,84 @@ export class ColorSchemeViewer extends LitElement {
       color: var(--error, #b3261e);
       margin-top: 6px;
       min-height: 18px;
+    }
+
+    /* ─── Hue slider ─── */
+    .hue-slider-group {
+      margin-top: 4px;
+    }
+
+    .hue-slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .hue-slider-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--on-surface-variant, #666);
+      transition: var(--transition-color);
+    }
+
+    .hue-slider-value {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 12px;
+      color: var(--on-surface-variant, #666);
+      transition: var(--transition-color);
+    }
+
+    .hue-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 16px;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      border: 2px solid var(--outline-variant, #ddd);
+      transition: border-color 0.2s ease;
+    }
+
+    .hue-slider:focus {
+      border-color: var(--primary, #6750a4);
+    }
+
+    /* Webkit thumb */
+    .hue-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid var(--on-surface, #1d1b20);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .hue-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Firefox thumb */
+    .hue-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid var(--on-surface, #1d1b20);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+    }
+
+    .hue-slider::-moz-range-track {
+      height: 12px;
+      border-radius: 6px;
     }
 
     /* ─── Mode toggle (light/dark) ─── */
@@ -570,56 +657,15 @@ export class ColorSchemeViewer extends LitElement {
     this._colors = generateScheme(hex, this._variant, this._isDark);
     this._variantPreviews = generateVariantPreviews(hex, this._isDark);
 
-    // Apply M3 tokens as CSS custom properties on the host for self-theming
-    if (this._colors) {
-      const c = this._colors;
-      const props: Record<string, string> = {
-        "--primary": c.primary,
-        "--on-primary": c.onPrimary,
-        "--primary-container": c.primaryContainer,
-        "--on-primary-container": c.onPrimaryContainer,
-        "--secondary": c.secondary,
-        "--on-secondary": c.onSecondary,
-        "--secondary-container": c.secondaryContainer,
-        "--on-secondary-container": c.onSecondaryContainer,
-        "--tertiary": c.tertiary,
-        "--on-tertiary": c.onTertiary,
-        "--tertiary-container": c.tertiaryContainer,
-        "--on-tertiary-container": c.onTertiaryContainer,
-        "--error": c.error,
-        "--on-error": c.onError,
-        "--error-container": c.errorContainer,
-        "--on-error-container": c.onErrorContainer,
-        "--surface": c.surface,
-        "--on-surface": c.onSurface,
-        "--surface-variant": c.surfaceVariant,
-        "--on-surface-variant": c.onSurfaceVariant,
-        "--surface-dim": c.surfaceDim,
-        "--surface-bright": c.surfaceBright,
-        "--surface-container-lowest": c.surfaceContainerLowest,
-        "--surface-container-low": c.surfaceContainerLow,
-        "--surface-container": c.surfaceContainer,
-        "--surface-container-high": c.surfaceContainerHigh,
-        "--surface-container-highest": c.surfaceContainerHighest,
-        "--outline": c.outline,
-        "--outline-variant": c.outlineVariant,
-        "--inverse-surface": c.inverseSurface,
-        "--inverse-on-surface": c.inverseOnSurface,
-        "--inverse-primary": c.inversePrimary,
-        "--shadow": c.shadow,
-        "--scrim": c.scrim,
-      };
-      for (const [name, value] of Object.entries(props)) {
-        this.style.setProperty(name, value);
-      }
-    }
+    // Decompose seed into HCT for the hue slider
+    const hct = hexToHCT(hex);
+    this._hue = hct.hue;
+    this._chroma = hct.chroma;
+    this._tone = hct.tone;
+    this._updateHueGradient();
 
-    // Sync dark attribute for external styling (body)
-    if (this._isDark) {
-      this.setAttribute("dark", "");
-    } else {
-      this.removeAttribute("dark");
-    }
+    this._applyTokens();
+    this._syncDarkAttribute();
   }
 
   // ────────────────────────────────────────────
@@ -643,6 +689,80 @@ export class ColorSchemeViewer extends LitElement {
       this._hexInput = this._hexInput.startsWith("#")
         ? this._hexInput.toUpperCase()
         : `#${this._hexInput.toUpperCase()}`;
+    }
+  }
+
+  private _onHueInput(e: Event) {
+    const hue = parseFloat((e.target as HTMLInputElement).value);
+    this._hue = hue;
+    // Reconstruct hex from new hue + existing chroma/tone
+    const newHex = hctToHex(hue, this._chroma, this._tone);
+    this._hexInput = newHex;
+    this.seed = newHex;
+    // Regenerate scheme but skip re-decomposing HCT (we already have correct values)
+    this._colors = generateScheme(newHex, this._variant, this._isDark);
+    this._variantPreviews = generateVariantPreviews(newHex, this._isDark);
+    this._applyTokens();
+    this._syncDarkAttribute();
+  }
+
+  /** Compute the hue gradient CSS using the primary's fixed chroma + tone */
+  private _updateHueGradient() {
+    const stops = generateHueGradient(this._chroma, this._tone, 36);
+    this._hueGradient = `linear-gradient(to right, ${stops.join(", ")})`;
+  }
+
+  /** Apply M3 tokens as CSS custom properties on the host */
+  private _applyTokens() {
+    if (!this._colors) return;
+    const c = this._colors;
+    const props: Record<string, string> = {
+      "--primary": c.primary,
+      "--on-primary": c.onPrimary,
+      "--primary-container": c.primaryContainer,
+      "--on-primary-container": c.onPrimaryContainer,
+      "--secondary": c.secondary,
+      "--on-secondary": c.onSecondary,
+      "--secondary-container": c.secondaryContainer,
+      "--on-secondary-container": c.onSecondaryContainer,
+      "--tertiary": c.tertiary,
+      "--on-tertiary": c.onTertiary,
+      "--tertiary-container": c.tertiaryContainer,
+      "--on-tertiary-container": c.onTertiaryContainer,
+      "--error": c.error,
+      "--on-error": c.onError,
+      "--error-container": c.errorContainer,
+      "--on-error-container": c.onErrorContainer,
+      "--surface": c.surface,
+      "--on-surface": c.onSurface,
+      "--surface-variant": c.surfaceVariant,
+      "--on-surface-variant": c.onSurfaceVariant,
+      "--surface-dim": c.surfaceDim,
+      "--surface-bright": c.surfaceBright,
+      "--surface-container-lowest": c.surfaceContainerLowest,
+      "--surface-container-low": c.surfaceContainerLow,
+      "--surface-container": c.surfaceContainer,
+      "--surface-container-high": c.surfaceContainerHigh,
+      "--surface-container-highest": c.surfaceContainerHighest,
+      "--outline": c.outline,
+      "--outline-variant": c.outlineVariant,
+      "--inverse-surface": c.inverseSurface,
+      "--inverse-on-surface": c.inverseOnSurface,
+      "--inverse-primary": c.inversePrimary,
+      "--shadow": c.shadow,
+      "--scrim": c.scrim,
+    };
+    for (const [name, value] of Object.entries(props)) {
+      this.style.setProperty(name, value);
+    }
+  }
+
+  /** Sync the dark attribute for external body styling */
+  private _syncDarkAttribute() {
+    if (this._isDark) {
+      this.setAttribute("dark", "");
+    } else {
+      this.removeAttribute("dark");
     }
   }
 
@@ -1005,6 +1125,24 @@ export class ColorSchemeViewer extends LitElement {
               ${!isValidHex(this._hexInput) && this._hexInput.length > 1
                 ? "Enter a valid hex color"
                 : ""}
+            </div>
+
+            <!-- Hue slider -->
+            <div class="hue-slider-group">
+              <div class="hue-slider-header">
+                <span class="hue-slider-label">Hue</span>
+                <span class="hue-slider-value">${Math.round(this._hue)}\u00B0</span>
+              </div>
+              <input
+                class="hue-slider"
+                type="range"
+                min="0"
+                max="360"
+                step="1"
+                .value=${String(Math.round(this._hue))}
+                @input=${this._onHueInput}
+                style="background:${this._hueGradient}"
+              />
             </div>
           </div>
 
